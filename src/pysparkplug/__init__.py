@@ -13,6 +13,7 @@ from pysparkplug._enums import (
     QoS,
     Transport,
 )
+from pysparkplug._host_application import HostApplication
 from pysparkplug._error import MQTTError
 from pysparkplug._message import Message
 from pysparkplug._metadata import Metadata

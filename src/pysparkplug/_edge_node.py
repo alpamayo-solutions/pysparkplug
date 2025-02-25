@@ -21,16 +21,17 @@ from pysparkplug._payload import DBirth, DData, DDeath, NBirth, NData, NDeath
 from pysparkplug._time import get_current_timestamp
 from pysparkplug._topic import Topic
 from pysparkplug._types import Self
+from pysparkplug._host_application import HostApplication
 
 __all__ = ["Device", "EdgeNode"]
 logger = logging.getLogger(__name__)
 BD_SEQ = "bdSeq"
 SEQ_LIMIT = 256
 
+##newly edited code
 
-def _default_cmd_callback(_: EdgeNode, message: Message) -> None:
+def _default_cmd_callback(_: "EdgeNode", message: Message) -> None:
     logger.info(f"Received command {message}")
-
 
 class EdgeNode:
     """Class representing an EdgeNode in Sparkplug B
@@ -54,13 +55,15 @@ class EdgeNode:
 
     group_id: str
     edge_node_id: str
+    auto_alias: bool = True
+
     _metrics: dict[str, Metric]
     _devices: dict[str, Device]
     _client: Client
 
     _bd_seq_metric: Metric
-    __seq_cycler: itertools.cycle[int] = itertools.cycle(range(SEQ_LIMIT))
-    __bd_seq_cycler: itertools.cycle[int] = itertools.cycle(range(SEQ_LIMIT))
+    __seq_cycler = itertools.cycle(range(SEQ_LIMIT))
+    __bd_seq_cycler = itertools.cycle(range(SEQ_LIMIT))
     _connected: bool = False
 
     def __init__(
@@ -172,7 +175,7 @@ class EdgeNode:
                     topic=n_birth_topic,
                     payload=n_birth,
                     qos=QoS.AT_MOST_ONCE,
-                    retain=False,
+                    retain=True,
                 ),
                 include_dtypes=True,
             )
@@ -195,7 +198,7 @@ class EdgeNode:
                         topic=d_birth_topic,
                         payload=d_birth,
                         qos=QoS.AT_MOST_ONCE,
-                        retain=False,
+                        retain=True,
                     ),
                     include_dtypes=True,
                 )
@@ -272,7 +275,7 @@ class EdgeNode:
                     topic=d_birth_topic,
                     payload=d_birth,
                     qos=QoS.AT_MOST_ONCE,
-                    retain=False,
+                    retain=True,
                 ),
                 include_dtypes=True,
             )
@@ -364,7 +367,7 @@ class EdgeNode:
         """Returns a copy of the devices for this edge node in a dictionary"""
         return self._devices.copy()
 
-    def update(self, metrics: Iterable[Metric]) -> None:
+    def _update(self, metrics: Iterable[Metric]) -> None:
         """Update some (or all) of the edge node's metrics
 
         Args:
@@ -402,7 +405,7 @@ class EdgeNode:
             include_dtypes=True,
         )
 
-    def update_device(self, device_id: str, metrics: Iterable[Metric]) -> None:
+    def _update_device(self, device_id: str, metrics: Iterable[Metric]) -> None:
         """Update some (or all) of the metrics associated with the provided device_id
 
         Args:
@@ -440,8 +443,100 @@ class EdgeNode:
     @property
     def _bd_seq(self) -> int:
         return next(self.__bd_seq_cycler)
+    
+    
+    # original code up to here --> below is the new code extending the current implementation
+    # TODO: PR or maintain in own repo?
 
 
+# class EdgeNode(EdgeNode):
+#     auto_alias: bool = True
+    
+#     def __init__(self, *args, **kwargs):
+        
+#         super().__init__(*args, **kwargs)
+#         self.auto_alias = kwargs.get("auto_alias", self.auto_alias)
+        
+        
+    def rebirth(self, metrics: Optional[list[Metric]]=None) -> None:
+        n_birth_topic = Topic(
+            message_type=MessageType.NBIRTH,
+            group_id=self.group_id,
+            edge_node_id=self.edge_node_id,
+        )
+        
+        if metrics is not None:
+            self._setup_metrics(metrics)
+        
+        metrics = (*self._metrics.values(), self._bd_seq_metric)
+        n_birth_payload = NBirth(
+            timestamp=get_current_timestamp(),
+            seq=self._seq,
+            metrics=metrics,
+        )
+        message = Message(
+            topic=n_birth_topic,
+            payload=n_birth_payload,
+            qos=QoS.AT_MOST_ONCE,
+            retain=True,
+        )
+        self._client.publish(message, include_dtypes=True)
+        
+        for device in self.devices.values():
+            self.rebirth_device(device)
+            
+    def update(self, metrics:list[Metric]):
+        if self.auto_alias:
+            for metric in metrics:
+                if metric.alias is None:
+                    pass
+                    # metric.alias = make_alias(self.group_id, self.edge_node_id, metric.name)
+            
+        if self._requires_rebirth(metrics):
+            self.rebirth(metrics)
+        else:
+            self._update(metrics)
+
+    def update_device(self, device_id: str, metrics: list[Metric]) -> None:
+        device = self.devices[device_id]
+        if device._requires_rebirth(metrics):
+            self.rebirth_device(device, metrics)
+        return self._update_device(device_id, metrics)
+        
+    def rebirth_device(self, device: Device, metrics: Optional[list[Metric]]) -> None:
+        d_birth_topic = Topic(
+            message_type=MessageType.DBIRTH,
+            group_id=self.group_id,
+            edge_node_id=self.edge_node_id,
+            device_id=device.device_id,
+        )
+        
+        if metrics is not None:
+            device._setup_metrics(metrics)
+        metrics = tuple(device.metrics.values())
+        
+        d_birth_payload = DBirth(
+            timestamp=get_current_timestamp(),
+            seq=self._seq,
+            metrics=metrics,
+        )
+        message = Message(
+            topic=d_birth_topic,
+            payload=d_birth_payload,
+            qos=QoS.AT_MOST_ONCE,
+            retain=True,
+        )
+        self._client.publish(message, include_dtypes=True)
+        device._metrics.update(device.last_metrics)
+    
+    def _requires_rebirth(self, metrics:list[Metric]):  
+        for metric in metrics:
+            if metric.name not in self._metrics.keys():
+                logging.debug(f"Rebirth required for node metric {metric.name}")  
+                return True
+        return False
+            
+    
 class Device:
     """Class representing a Device in Sparkplug B
 
@@ -512,3 +607,13 @@ class Device:
                     f"doesn't match {curr_metric.datatype}"
                 )
             self._metrics[metric.name] = metric
+    ##newly added 
+    #---------
+    def _requires_rebirth(self, metrics:list[Metric]): 
+        for metric in metrics:
+            if metric.name not in self._metrics.keys():
+                logging.debug(f"Rebirth required for device metric {metric.name}")  
+                return True
+        return False
+    #---------
+
