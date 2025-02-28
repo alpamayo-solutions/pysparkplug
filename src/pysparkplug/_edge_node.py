@@ -93,7 +93,8 @@ class EdgeNode:
         )
 
     def _setup_metrics(self, metrics: Iterable[Metric]) -> None:
-        self._metrics = {}
+        if not hasattr(self, "_metrics") or self._metrics is None:
+            self._metrics = {}
         for metric in metrics:
             if metric.name is None:
                 raise ValueError(
