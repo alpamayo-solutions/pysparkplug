@@ -368,7 +368,7 @@ class EdgeNode:
         """Returns a copy of the devices for this edge node in a dictionary"""
         return self._devices.copy()
 
-    def _update(self, metrics: Iterable[Metric]) -> None:
+    def _update(self, metrics: Iterable[Metric], retain: bool = False) -> None:
         """Update some (or all) of the edge node's metrics
 
         Args:
@@ -402,11 +402,11 @@ class EdgeNode:
             timestamp=get_current_timestamp(), seq=self._seq, metrics=tuple(metrics)
         )
         self._client.publish(
-            Message(topic=topic, payload=n_data, qos=QoS.AT_MOST_ONCE, retain=False),
+            Message(topic=topic, payload=n_data, qos=QoS.AT_MOST_ONCE, retain=retain),
             include_dtypes=True,
         )
 
-    def _update_device(self, device_id: str, metrics: Iterable[Metric]) -> None:
+    def _update_device(self, device_id: str, metrics: Iterable[Metric], retain: bool = False) -> None:
         """Update some (or all) of the metrics associated with the provided device_id
 
         Args:
@@ -432,7 +432,7 @@ class EdgeNode:
         d_data = DData(get_current_timestamp(), seq=self._seq, metrics=tuple(metrics))
         self._client.publish(
             Message(
-                topic=d_data_topic, payload=d_data, qos=QoS.AT_MOST_ONCE, retain=False
+                topic=d_data_topic, payload=d_data, qos=QoS.AT_MOST_ONCE, retain=retain
             ),
             include_dtypes=True,
         )
@@ -486,7 +486,7 @@ class EdgeNode:
         for device in self.devices.values():
             self.rebirth_device(device)
             
-    def update(self, metrics:list[Metric]):
+    def update(self, metrics:list[Metric], retain: bool = False):
         if self.auto_alias:
             for metric in metrics:
                 if metric.alias is None:
@@ -496,13 +496,13 @@ class EdgeNode:
         if self._requires_rebirth(metrics):
             self.rebirth(metrics)
         else:
-            self._update(metrics)
+            self._update(metrics, retain)
 
-    def update_device(self, device_id: str, metrics: list[Metric]) -> None:
+    def update_device(self, device_id: str, metrics: list[Metric], retain: bool = False) -> None:
         device = self.devices[device_id]
         if device._requires_rebirth(metrics):
             self.rebirth_device(device, metrics)
-        return self._update_device(device_id, metrics)
+        return self._update_device(device_id, metrics, retain)
         
     def rebirth_device(self, device: Device, metrics: Optional[list[Metric]]) -> None:
         d_birth_topic = Topic(
