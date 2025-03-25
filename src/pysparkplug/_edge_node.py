@@ -17,7 +17,7 @@ from pysparkplug._datatype import DataType
 from pysparkplug._enums import MessageType, QoS
 from pysparkplug._message import Message
 from pysparkplug._metric import Metric
-from pysparkplug._payload import DBirth, DData, DDeath, NBirth, NData, NDeath
+from pysparkplug._payload import DBirth, DData, DDeath, NBirth, NData, NDeath, NCmd
 from pysparkplug._time import get_current_timestamp
 from pysparkplug._topic import Topic
 from pysparkplug._types import Self
@@ -496,7 +496,26 @@ class EdgeNode:
         if self._requires_rebirth(metrics):
             self.rebirth(metrics)
         else:
-            self._update(metrics, retain)
+            self._update(metrics, retain)     
+
+    def send_node_command(self, metrics: list[Metric], group_id: str, qos: QoS, retain: bool = False) -> None:
+        n_cmd_topic = Topic(
+            message_type=MessageType.NCMD,
+            group_id=group_id,
+            edge_node_id=self.edge_node_id,
+        )
+        n_cmd_payload = NCmd(
+            timestamp=get_current_timestamp(),
+            metrics=metrics,
+        )
+        message = Message(
+            topic=n_cmd_topic,
+            payload=n_cmd_payload,
+            qos=qos,
+            retain=retain,
+        )
+        self._client.publish(message, include_dtypes=True)
+        
 
     def update_device(self, device_id: str, metrics: list[Metric], retain: bool = False) -> None:
         device = self.devices[device_id]
