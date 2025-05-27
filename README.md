@@ -16,17 +16,12 @@ This fork of the `pysparkplug` package, implementing the `Sparkplug-B` specficat
 Furthermore, this fork provides:
 
 - a `HostApplication` class based on the specification
-- a `DataOpsNode` class (not specified in the specification, but useful from our point of view)
+- a `DataOpsNode` class (not described in the specification, but useful from our point of view)
+- an automatic rebirthing mechanism for `EdgeNodes` and `Devices`
 
 ## Getting Started
 
 ### Installation
-
-`pysparkplug` is a pip-installable package [hosted on PyPI](https://pypi.org/project/pysparkplug/). Getting started is as easy as:
-
-```console
-$ pip install pysparkplug
-```
 
 `pysparkplug` uses the Eclipse Paho™ MQTT Python Client, i.e. [`paho-mqtt`](https://github.com/eclipse/paho.mqtt.python), for low-level MQTT communication.
 
