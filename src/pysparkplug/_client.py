@@ -239,7 +239,7 @@ class Client:
         topic = Topic.from_str(mqtt_message.topic)
         key = (topic.group_id, topic.edge_node_id, topic.device_id)
         birth = self._births.get(key)
-        payload_cls = Message.payload_class_from_topic(topic)
+        payload_cls = topic.message_type.payload
         payload_cls.use_json_payload = self.use_json_payload
         message = Message.from_mqtt_message(mqtt_message, birth=birth)
         if isinstance(message.payload, Birth):
