@@ -51,6 +51,8 @@ class EdgeNode:
             the broker
         cmd_callback:
             the callback function to execute when an NCMD payload is received
+        retain_birth_certificates:
+            if set to True, the birth certificates will be retained (not specified in the standard)
     """
 
     group_id: str
@@ -65,6 +67,7 @@ class EdgeNode:
     __seq_cycler = itertools.cycle(range(SEQ_LIMIT))
     __bd_seq_cycler = itertools.cycle(range(SEQ_LIMIT))
     _connected: bool = False
+    _retain_birth_certificates: bool = False
 
     def __init__(
         self,
@@ -73,12 +76,14 @@ class EdgeNode:
         metrics: Iterable[Metric],
         client: Optional[Client] = None,
         cmd_callback: Callable[[Self, Message], None] = _default_cmd_callback,
+        retain_birth_certificates: bool = False,
     ):
         self.group_id = group_id
         self.edge_node_id = edge_node_id
         self._setup_metrics(metrics)
         self._devices = {}
         self._client = client if client is not None else Client()
+        self._retain_birth_certificates = retain_birth_certificates
 
         # Subscribe to NCMD
         n_cmd_topic = Topic(
@@ -176,7 +181,7 @@ class EdgeNode:
                     topic=n_birth_topic,
                     payload=n_birth,
                     qos=QoS.AT_MOST_ONCE,
-                    retain=True,
+                    retain=self._retain_birth_certificates,
                 ),
                 include_dtypes=True,
             )
@@ -199,7 +204,7 @@ class EdgeNode:
                         topic=d_birth_topic,
                         payload=d_birth,
                         qos=QoS.AT_MOST_ONCE,
-                        retain=True,
+                        retain=self._retain_birth_certificates,
                     ),
                     include_dtypes=True,
                 )
@@ -276,7 +281,7 @@ class EdgeNode:
                     topic=d_birth_topic,
                     payload=d_birth,
                     qos=QoS.AT_MOST_ONCE,
-                    retain=True,
+                    retain=self._retain_birth_certificates,
                 ),
                 include_dtypes=True,
             )
@@ -479,7 +484,7 @@ class EdgeNode:
             topic=n_birth_topic,
             payload=n_birth_payload,
             qos=QoS.AT_MOST_ONCE,
-            retain=True,
+            retain=self._retain_birth_certificates,
         )
         self._client.publish(message, include_dtypes=True)
         
@@ -544,7 +549,7 @@ class EdgeNode:
             topic=d_birth_topic,
             payload=d_birth_payload,
             qos=QoS.AT_MOST_ONCE,
-            retain=True,
+            retain=self._retain_birth_certificates,
         )
         self._client.publish(message, include_dtypes=True)
         device._metrics.update(device.last_metrics)

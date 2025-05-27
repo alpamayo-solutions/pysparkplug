@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 import logging
 from typing import Callable, Iterable, Optional
 
@@ -62,6 +61,7 @@ class HostApplication:
         host_id: str,
         client: Optional[Client] = None,
         message_callback: Callable[[Self, Message], None] = _default_message_callback,
+        retain_birth_certificates: bool = False,
     ):
         self.host_id = host_id
         self._client = client if client is not None else Client()

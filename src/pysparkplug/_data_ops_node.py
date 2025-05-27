@@ -33,17 +33,20 @@ class DataOpsNode:
  
     # Internal state to track published metrics for each topic
     _published_metrics: Dict[Tuple[str, str], Dict[str, Metric]]
+    _retain_birth_certificates: bool = False
  
     def __init__(
         self,
         node_id: str,
         client: Optional[Client] = None,
         message_callback: Callable[[Self, Message], None] = _default_message_callback,
+        retain_birth_certificates: bool = False,
     ):
         self.node_id = node_id
         self._client = client if client else Client()
         self._message_callback = message_callback
         self._published_metrics = {}
+        self._retain_birth_certificates = retain_birth_certificates
  
     def connect(
         self,
@@ -158,7 +161,7 @@ class DataOpsNode:
             seq=0,  # Simple seq handling; adjust as necessary
             metrics=list(metrics),
         )
-        message = Message(topic=topic, payload=payload, qos=QoS.AT_MOST_ONCE, retain=True)
+        message = Message(topic=topic, payload=payload, qos=QoS.AT_MOST_ONCE, retain=self._retain_birth_certificates)
         self._client.publish(message, include_dtypes=True)
         logger.info(f"[DataOpsNode:{self.node_id}] Published NBIRTH to {group_id}/{edge_node_id}")
  
