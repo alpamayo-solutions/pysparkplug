@@ -61,7 +61,7 @@ class Client:
     ) -> None:
         self.use_json_payload = use_json_payload
         self._client = paho_mqtt.Client(
-            client_id=client_id,  # type: ignore[reportArgumentType]
+            client_id=client_id,
             clean_session=True,
             protocol=protocol,
             transport=(
@@ -116,7 +116,7 @@ class Client:
         else:
             self._client.will_set(
                 topic=str(message.topic),
-                payload=message.payload.encode(),
+                payload=message.payload.to_json() if self.use_json_payload else message.payload.encode(),
                 qos=message.qos,
                 retain=message.retain,
             )
@@ -197,10 +197,9 @@ class Client:
             include_dtypes:
                 whether or not to include the dtypes of the message
         """
-        message.payload.use_json_payload = self.use_json_payload 
         result = self._client.publish(
             topic=str(message.topic),
-            payload=message.payload.encode(include_dtypes=include_dtypes),
+            payload=message.payload.to_json(include_dtypes=include_dtypes) if self.use_json_payload else message.payload.encode(include_dtypes=include_dtypes),
             qos=message.qos,
             retain=message.retain,
         )
@@ -239,9 +238,7 @@ class Client:
         topic = Topic.from_str(mqtt_message.topic)
         key = (topic.group_id, topic.edge_node_id, topic.device_id)
         birth = self._births.get(key)
-        payload_cls = Message.payload_class_from_topic(topic)
-        payload_cls.use_json_payload = self.use_json_payload
-        message = Message.from_mqtt_message(mqtt_message, birth=birth)
+        message = Message.from_mqtt_message(mqtt_message, birth=birth, use_json_payload=self.use_json_payload)
         if isinstance(message.payload, Birth):
             self._births[key] = message.payload
         return message

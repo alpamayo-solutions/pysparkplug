@@ -36,7 +36,7 @@ class Message:
 
     @classmethod
     def from_mqtt_message(
-        cls, mqtt_message: paho_mqtt.MQTTMessage, *, birth: Optional[Birth] = None
+        cls, mqtt_message: paho_mqtt.MQTTMessage, *, birth: Optional[Birth] = None, use_json_payload: bool = False
     ) -> Self:
         """Constructs a Message object from a Paho MQTTMessage object
 
@@ -46,15 +46,17 @@ class Message:
             birth:
                 the Birth object associated with this message,
                 for decoding aliases and dropped dtypes
+            use_json_payload:
+                whether to use JSON encoding/decoding
         """
         topic = Topic.from_str(mqtt_message.topic)
         # We have to ignore some mypy here since we know that mqtt gives us a
         # fully defined topic, i.e. no wildcards.
+        payload_cls = topic.message_type.payload
+        payload = payload_cls.from_json(mqtt_message.payload, birth=birth) if use_json_payload else payload_cls.decode(mqtt_message.payload, birth=birth)
         return cls(
             topic=topic,
-            payload=topic.message_type.payload.decode(  # type: ignore[union-attr]
-                mqtt_message.payload, birth=birth
-            ),
+            payload=payload,
             qos=QoS(mqtt_message.qos),
             retain=mqtt_message.retain,
         )

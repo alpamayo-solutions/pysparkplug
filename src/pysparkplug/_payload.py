@@ -11,7 +11,7 @@ from pysparkplug import _protobuf as protobuf
 from pysparkplug._datatype import DataType
 from pysparkplug._metric import Metric
 from pysparkplug._types import Self
-from pysparkplug._json_payload import payload_from_json, payload_to_json
+from pysparkplug._json_payload import payload_from_json, payload_to_json, metric_from_json
 
 __all__ = [
     "DBirth",
@@ -60,20 +60,51 @@ class Payload(Protocol):
         """
         raise NotImplementedError()
 
+    @abstractmethod
+    def to_json(self, *, include_dtypes: bool = False) -> bytes:
+        """Encode Payload object into JSON bytes
 
-class _BasePayload:
-    use_json_payload: bool = False  # default to protobuf
+        Args:
+            include_dtypes:
+                whether or not to include dtypes
+
+        Returns:
+            encoded payload in JSON bytes
+        """
+        raise NotImplementedError()
 
     @classmethod
+    @abstractmethod
+    def from_json(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
+        """Construct a Payload object from JSON bytes
+
+        Args:
+            raw:
+                JSON bytes to decode into a Payload object
+            birth:
+                the Birth object associated with this message,
+                for decoding aliases and dropped dtypes
+
+        Returns:
+            Payload object
+        """
+        raise NotImplementedError()
+
+
+class _BasePayload:
+    @classmethod
     def decode(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
-        if cls.use_json_payload:
-            return payload_from_json(cls, raw, birth=birth)
         return cls._decode_protobuf(raw, birth=birth)
 
     def encode(self, *, include_dtypes: bool = False) -> bytes:
-        if self.use_json_payload:
-            return payload_to_json(self, include_dtypes=include_dtypes)
         return self._encode_protobuf(include_dtypes=include_dtypes)
+
+    def to_json(self, *, include_dtypes: bool = False) -> bytes:
+        return payload_to_json(self, include_dtypes=include_dtypes)
+
+    @classmethod
+    def from_json(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
+        return payload_from_json(cls, raw, birth=birth)
 
     @classmethod
     def _decode_protobuf(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
@@ -337,6 +368,41 @@ class NDeath:
         payload.metrics.append(self.bd_seq_metric.to_pb(include_dtype=include_dtypes))
         return cast(bytes, payload.SerializeToString())
 
+    def to_json(self, *, include_dtypes: bool = False) -> bytes:
+        """Encode NDeath object into JSON bytes
+
+        Args:
+            include_dtypes:
+                whether or not to include dtypes
+
+        Returns:
+            encoded payload in JSON bytes
+        """
+        data = {
+            "timestamp": self.timestamp,
+            "bd_seq_metric": metric_to_json(self.bd_seq_metric, include_dtype=True)
+        }
+        return json.dumps(data).encode()
+
+    @classmethod
+    def from_json(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
+        """Construct an NDeath object from JSON bytes
+
+        Args:
+            raw:
+                JSON bytes to decode into a NDeath object
+            birth:
+                unused input since NDeaths don't have any metrics with aliases or dropped dtypes
+
+        Returns:
+            NDeath object
+        """
+        data = json.loads(raw.decode())
+        return cls(
+            timestamp=data["timestamp"],
+            bd_seq_metric=metric_from_json(data["bd_seq_metric"])
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class DDeath:
@@ -391,6 +457,41 @@ class DDeath:
         payload.seq = self.seq
         return cast(bytes, payload.SerializeToString())
 
+    def to_json(self, *, include_dtypes: bool = False) -> bytes:
+        """Encode DDeath object into JSON bytes
+
+        Args:
+            include_dtypes:
+                unused input since DDeaths have no metrics
+
+        Returns:
+            encoded payload in JSON bytes
+        """
+        data = {
+            "timestamp": self.timestamp,
+            "seq": self.seq
+        }
+        return json.dumps(data).encode()
+
+    @classmethod
+    def from_json(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
+        """Construct a DDeath object from JSON bytes
+
+        Args:
+            raw:
+                JSON bytes to decode into a DDeath object
+            birth:
+                unused input since DDeaths don't have any metrics
+
+        Returns:
+            DDeath object
+        """
+        data = json.loads(raw.decode())
+        return cls(
+            timestamp=data["timestamp"],
+            seq=data["seq"]
+        )
+
 
 @dataclasses.dataclass(frozen=True)
 class State:
@@ -440,4 +541,31 @@ class State:
         Returns:
             encoded payload in bytes
         """
+        return self.to_json()
+
+    def to_json(self, *, include_dtypes: bool = False) -> bytes:
+        """Encode State object into JSON bytes
+
+        Args:
+            include_dtypes:
+                unused input since States have no metrics
+
+        Returns:
+            encoded payload in JSON bytes
+        """
         return json.dumps({"timestamp": self.timestamp, "online": self.online}).encode()
+
+    @classmethod
+    def from_json(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
+        """Construct a State object from JSON bytes
+
+        Args:
+            raw:
+                JSON bytes to decode into a State object
+            birth:
+                unused input since States don't have any metrics
+
+        Returns:
+            State object
+        """
+        return cls.decode(raw, birth=birth)
