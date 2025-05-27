@@ -11,7 +11,7 @@ from pysparkplug import _protobuf as protobuf
 from pysparkplug._datatype import DataType
 from pysparkplug._metric import Metric
 from pysparkplug._types import Self
-from pysparkplug._json_payload import payload_from_json, payload_to_json, metric_from_json
+from pysparkplug._json_payload import payload_from_json, payload_to_json, metric_from_json, metric_to_json
 
 __all__ = [
     "DBirth",
