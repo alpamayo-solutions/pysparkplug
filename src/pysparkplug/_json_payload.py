@@ -29,8 +29,6 @@ def metric_to_json(metric: Metric, *, include_dtype: bool = False) -> Dict[str, 
         result["is_null"] = True
     if metric.metadata is not None:
         result["metadata"] = metric.metadata
-    if metric.properties is not None:
-        result["properties"] = metric.properties
         
     # Handle value based on datatype
     if not metric.is_null and metric.value is not None:
