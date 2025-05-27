@@ -11,6 +11,7 @@ from pysparkplug import _protobuf as protobuf
 from pysparkplug._datatype import DataType
 from pysparkplug._metric import Metric
 from pysparkplug._types import Self
+from pysparkplug._json_payload import payload_from_json, payload_to_json
 
 __all__ = [
     "DBirth",
@@ -60,61 +61,50 @@ class Payload(Protocol):
         raise NotImplementedError()
 
 
-class _PBPayload:
+class _BasePayload:
+    use_json_payload: bool = False  # default to protobuf
+
     @classmethod
     def decode(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
-        """Construct a Payload object from bytes
+        if cls.use_json_payload:
+            return payload_from_json(cls, raw, birth=birth)
+        return cls._decode_protobuf(raw, birth=birth)
 
-        Args:
-            raw:
-                bytes to decode into a Payload object
-            birth:
-                the Birth object associated with this message,
-                for decoding aliases and dropped dtypes
+    def encode(self, *, include_dtypes: bool = False) -> bytes:
+        if self.use_json_payload:
+            return payload_to_json(self, include_dtypes=include_dtypes)
+        return self._encode_protobuf(include_dtypes=include_dtypes)
 
-        Returns:
-            Payload object
-        """
+    @classmethod
+    def _decode_protobuf(cls, raw: bytes, *, birth: Optional[Birth] = None) -> Self:
         payload = protobuf.Payload.FromString(raw)
-        if birth is not None:
+        if birth:
             for metric in payload.metrics:
                 if not metric.name:
                     metric.name = birth.get_name(metric.alias)
                 if metric.datatype == DataType.UNKNOWN:
                     metric.datatype = birth.get_dtype(metric.name)
-        if not payload.HasField("timestamp"):
-            raise ValueError("Sparkplug payload missing required timestamp field")
         kwargs = {
             "timestamp": payload.timestamp,
-            "metrics": tuple(Metric.from_pb(metric) for metric in payload.metrics),
+            "metrics": tuple(Metric.from_pb(m) for m in payload.metrics),
         }
         if payload.HasField("seq"):
             kwargs["seq"] = payload.seq
         return cls(**kwargs)
 
-    def encode(self, *, include_dtypes: bool = False) -> bytes:
-        """Encode Payload object into bytes
-
-        Args:
-            include_dtypes:
-                whether or not to include dtypes
-
-        Returns:
-            encoded payload in bytes
-        """
+    def _encode_protobuf(self, *, include_dtypes: bool = False) -> bytes:
         payload = protobuf.Payload()
-        payload.timestamp = self.timestamp  # type: ignore[attr-defined]
+        payload.timestamp = self.timestamp
         if hasattr(self, "seq"):
-            payload.seq = self.seq  # type: ignore[reportAttributeAccessIssue]
+            payload.seq = self.seq
         payload.metrics.extend(
-            metric.to_pb(include_dtype=include_dtypes)
-            for metric in self.metrics  # type: ignore[attr-defined]
+            metric.to_pb(include_dtype=include_dtypes) for metric in self.metrics
         )
         return cast(bytes, payload.SerializeToString())
 
 
 @dataclasses.dataclass(frozen=True)
-class Birth(_PBPayload):
+class Birth(_BasePayload):
     """Class representing a Birth payload
 
     Args:
@@ -232,7 +222,7 @@ class DBirth(Birth):
 
 
 @dataclasses.dataclass(frozen=True)
-class _Data(_PBPayload):
+class _Data(_BasePayload):
     timestamp: int
     seq: int
     metrics: tuple[Metric, ...]
@@ -265,7 +255,7 @@ class DData(_Data):
 
 
 @dataclasses.dataclass(frozen=True)
-class _Cmd(_PBPayload):
+class _Cmd(_BasePayload):
     timestamp: int
     metrics: tuple[Metric, ...]
 

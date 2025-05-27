@@ -40,7 +40,10 @@ class Client:
             client will use to connect to the broker
         client_options:
             a config object defining various options for the client
+        use_json_payload:
+            when True, the client will use JSON payloads instead of protobuf (helpful for debugging or when human-readable payloads are desired)
     """
+    use_json_payload: bool
 
     _client: paho_mqtt.Client
     _subscriptions: dict[Topic, QoS]
@@ -54,7 +57,9 @@ class Client:
         password: Optional[str] = None,
         transport_config: Optional[Union[TLSConfig, WSConfig]] = None,
         client_options: ClientOptions = ClientOptions(),
+        use_json_payload: bool = False,
     ) -> None:
+        self.use_json_payload = use_json_payload
         self._client = paho_mqtt.Client(
             client_id=client_id,  # type: ignore[reportArgumentType]
             clean_session=True,
@@ -192,6 +197,7 @@ class Client:
             include_dtypes:
                 whether or not to include the dtypes of the message
         """
+        message.payload.use_json_payload = self.use_json_payload 
         result = self._client.publish(
             topic=str(message.topic),
             payload=message.payload.encode(include_dtypes=include_dtypes),
@@ -233,10 +239,11 @@ class Client:
         topic = Topic.from_str(mqtt_message.topic)
         key = (topic.group_id, topic.edge_node_id, topic.device_id)
         birth = self._births.get(key)
+        payload_cls = Message.payload_class_from_topic(topic)
+        payload_cls.use_json_payload = self.use_json_payload
         message = Message.from_mqtt_message(mqtt_message, birth=birth)
         if isinstance(message.payload, Birth):
             self._births[key] = message.payload
-
         return message
 
     def _subscribe(self, topic: Topic, qos: QoS) -> None:
