@@ -1,4 +1,4 @@
-# **PySparkplug**: Sparkplug B for Python
+# **PySparkplug**: Sparkplug B for Python (modified)
 
 [![CI/CD: n/a](https://github.com/matteosox/pysparkplug/actions/workflows/cicd.yaml/badge.svg)](https://github.com/matteosox/pysparkplug/actions/workflows/cicd.yaml)
 [![Docs: n/a](https://readthedocs.org/projects/pysparkplug/badge/?version=stable)](https://pysparkplug.mattefay.com)
@@ -8,7 +8,7 @@
 
 ## About this Fork
 
-This fork of the `pysparkplug` package, implementing the `Sparkplug-B` specfication, intends to remain interoperability with the specification, while making some aspects of the standard optional, when used internally. Deviations from the standard are:
+This fork of the `pysparkplug` package, implementing the `Sparkplug-B` specfication, intends to maintain interoperability with the specification, while making some aspects of the standard optional, when used internally. Deviations from the standard are:
 
 - retention of birth certificates
 - optionally disable Protobuf payload encodings (they are replaced by human-readable JSON payloads)
