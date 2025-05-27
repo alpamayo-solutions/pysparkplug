@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional, cast
+import logging
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from pysparkplug._datatype import DataType
 from pysparkplug._metric import Metric
@@ -32,20 +34,19 @@ def metric_to_json(metric: Metric, *, include_dtype: bool = False) -> Dict[str, 
         
     # Handle value based on datatype
     if not metric.is_null and metric.value is not None:
-        if metric.datatype in (DataType.BOOLEAN, DataType.INT8, DataType.INT16, 
-                             DataType.INT32, DataType.INT64, DataType.UINT8, 
-                             DataType.UINT16, DataType.UINT32, DataType.UINT64,
-                             DataType.FLOAT, DataType.DOUBLE, DataType.STRING):
-            result["value"] = metric.value
-        elif metric.datatype == DataType.BYTES:
-            result["value"] = list(metric.value)
-        elif metric.datatype == DataType.DATASET:
+        if metric.datatype == DataType.DATASET:
             result["value"] = {
                 "num_of_columns": metric.value.num_of_columns,
                 "columns": [col.name for col in metric.value.columns],
                 "types": [col.type.value for col in metric.value.columns],
                 "rows": [[cell.value for cell in row.cells] for row in metric.value.rows]
             }
+        elif metric.datatype == DataType.BYTES:
+            result["value"] = list(metric.value)
+        elif metric.datatype == DataType.DATETIME:
+            result["value"] = metric.value.isoformat()
+        elif metric.datatype == DataType.DATETIME_ARRAY:
+            result["value"] = [dt.isoformat() for dt in metric.value]
         elif metric.datatype == DataType.TEMPLATE:
             result["value"] = {
                 "version": metric.value.version,
@@ -60,6 +61,8 @@ def metric_to_json(metric: Metric, *, include_dtype: bool = False) -> Dict[str, 
                     } for p in metric.value.parameters
                 ]
             }
+        else:
+            result["value"] = metric.value
             
     return result
 
@@ -83,18 +86,15 @@ def metric_from_json(data: Dict[str, Any]) -> Metric:
         kwargs["is_null"] = True
     if "metadata" in data:
         kwargs["metadata"] = data["metadata"]
-    if "properties" in data:
-        kwargs["properties"] = data["properties"]
         
     # Handle value based on datatype
     if "value" in data and not data.get("is_null"):
-        if kwargs.get("datatype") in (DataType.BOOLEAN, DataType.INT8, DataType.INT16, 
-                                    DataType.INT32, DataType.INT64, DataType.UINT8, 
-                                    DataType.UINT16, DataType.UINT32, DataType.UINT64,
-                                    DataType.FLOAT, DataType.DOUBLE, DataType.STRING):
-            kwargs["value"] = data["value"]
-        elif kwargs.get("datatype") == DataType.BYTES:
+        if kwargs.get("datatype") == DataType.BYTES:
             kwargs["value"] = bytes(data["value"])
+        elif kwargs.get("datatype") == DataType.DATETIME:
+            kwargs["value"] = datetime.fromisoformat(data["value"])
+        elif kwargs.get("datatype") == DataType.DATETIME_ARRAY:
+            kwargs["value"] = [datetime.fromisoformat(dt) for dt in data["value"]]
         elif kwargs.get("datatype") == DataType.DATASET:
             from pysparkplug._protobuf import DataSet, DataSetValue, Row
             dataset = DataSet()
@@ -125,6 +125,8 @@ def metric_from_json(data: Dict[str, Any]) -> Metric:
                 param.value = param_data["value"]
                 template.parameters.append(param)
             kwargs["value"] = template
+        else:
+            kwargs["value"] = data["value"]
             
     return Metric(**kwargs)
 
