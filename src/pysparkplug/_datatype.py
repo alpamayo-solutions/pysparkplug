@@ -48,6 +48,7 @@ class DataType(enum.IntEnum):
     BOOLEAN_ARRAY = 32
     STRING_ARRAY = 33
     DATETIME_ARRAY = 34
+    JSON = 35 #: only supported with allow_json_payload flag set to True
 
     @property
     def field(self) -> str:
