@@ -373,7 +373,7 @@ class EdgeNode:
         """Returns a copy of the devices for this edge node in a dictionary"""
         return self._devices.copy()
 
-    def _update(self, metrics: Iterable[Metric], retain: bool = False) -> None:
+    def _update(self, metrics: Iterable[Metric], retain: bool = False, qos: QoS = QoS.AT_MOST_ONCE) -> None:
         """Update some (or all) of the edge node's metrics
 
         Args:
@@ -407,7 +407,7 @@ class EdgeNode:
             timestamp=get_current_timestamp(), seq=self._seq, metrics=tuple(metrics)
         )
         self._client.publish(
-            Message(topic=topic, payload=n_data, qos=QoS.AT_MOST_ONCE, retain=retain),
+            Message(topic=topic, payload=n_data, qos=qos, retain=retain),
             include_dtypes=True,
         )
 
