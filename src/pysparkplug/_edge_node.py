@@ -411,7 +411,7 @@ class EdgeNode:
             include_dtypes=True,
         )
 
-    def _update_device(self, device_id: str, metrics: Iterable[Metric], retain: bool = False) -> None:
+    def _update_device(self, device_id: str, metrics: Iterable[Metric], retain: bool = False, qos: QoS = QoS.AT_MOST_ONCE) -> None:
         """Update some (or all) of the metrics associated with the provided device_id
 
         Args:
@@ -437,7 +437,7 @@ class EdgeNode:
         d_data = DData(get_current_timestamp(), seq=self._seq, metrics=tuple(metrics))
         self._client.publish(
             Message(
-                topic=d_data_topic, payload=d_data, qos=QoS.AT_MOST_ONCE, retain=retain
+                topic=d_data_topic, payload=d_data, qos=qos, retain=retain
             ),
             include_dtypes=True,
         )
@@ -464,7 +464,7 @@ class EdgeNode:
 #         self.auto_alias = kwargs.get("auto_alias", self.auto_alias)
         
         
-    def rebirth(self, metrics: Optional[list[Metric]]=None) -> None:
+    def rebirth(self, metrics: Optional[list[Metric]]=None, qos: QoS = QoS.AT_MOST_ONCE) -> None:
         n_birth_topic = Topic(
             message_type=MessageType.NBIRTH,
             group_id=self.group_id,
@@ -483,7 +483,7 @@ class EdgeNode:
         message = Message(
             topic=n_birth_topic,
             payload=n_birth_payload,
-            qos=QoS.AT_MOST_ONCE,
+            qos=qos,
             retain=self._retain_birth_certificates,
         )
         self._client.publish(message, include_dtypes=True)
@@ -491,7 +491,7 @@ class EdgeNode:
         for device in self.devices.values():
             self.rebirth_device(device)
             
-    def update(self, metrics:list[Metric], retain: bool = False):
+    def update(self, metrics:list[Metric], retain: bool = False, qos: QoS = QoS.AT_MOST_ONCE):
         if self.auto_alias:
             for metric in metrics:
                 if metric.alias is None:
@@ -499,36 +499,17 @@ class EdgeNode:
                     # metric.alias = make_alias(self.group_id, self.edge_node_id, metric.name)
             
         if self._requires_rebirth(metrics):
-            self.rebirth(metrics)
+            self.rebirth(metrics, qos)
         else:
-            self._update(metrics, retain)     
+            self._update(metrics, retain, qos)     
 
-    def send_node_command(self, metrics: list[Metric], group_id: str, qos: QoS, retain: bool = False) -> None:
-        n_cmd_topic = Topic(
-            message_type=MessageType.NCMD,
-            group_id=group_id,
-            edge_node_id=self.edge_node_id,
-        )
-        n_cmd_payload = NCmd(
-            timestamp=get_current_timestamp(),
-            metrics=metrics,
-        )
-        message = Message(
-            topic=n_cmd_topic,
-            payload=n_cmd_payload,
-            qos=qos,
-            retain=retain,
-        )
-        self._client.publish(message, include_dtypes=True)
-        
-
-    def update_device(self, device_id: str, metrics: list[Metric], retain: bool = False) -> None:
+    def update_device(self, device_id: str, metrics: list[Metric], retain: bool = False, qos: QoS = QoS.AT_MOST_ONCE) -> None:
         device = self.devices[device_id]
         if device._requires_rebirth(metrics):
-            self.rebirth_device(device, metrics)
-        return self._update_device(device_id, metrics, retain)
+            self.rebirth_device(device, metrics, qos)
+        return self._update_device(device_id, metrics, retain, qos)
         
-    def rebirth_device(self, device: Device, metrics: Optional[list[Metric]]) -> None:
+    def rebirth_device(self, device: Device, metrics: Optional[list[Metric]], qos: QoS = QoS.AT_MOST_ONCE) -> None:
         d_birth_topic = Topic(
             message_type=MessageType.DBIRTH,
             group_id=self.group_id,
@@ -548,7 +529,7 @@ class EdgeNode:
         message = Message(
             topic=d_birth_topic,
             payload=d_birth_payload,
-            qos=QoS.AT_MOST_ONCE,
+            qos=qos,
             retain=self._retain_birth_certificates,
         )
         self._client.publish(message, include_dtypes=True)

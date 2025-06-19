@@ -121,7 +121,7 @@ class HostApplication:
             # Publish STATE that the Host is online
             online_topic = Topic(message_type=MessageType.STATE, sparkplug_host_id=self.host_id) #could make a conflict with the subscription 
             online_payload = State(timestamp=get_current_timestamp(), online=True)
-            online_message = Message(topic=online_topic, payload=online_payload, qos=QoS.AT_MOST_ONCE, retain=True)
+            online_message = Message(topic=online_topic, payload=online_payload, qos=QoS.AT_LEAST_ONCE, retain=True)
             client.publish(online_message)
             
             if on_connect is not None:
@@ -192,7 +192,7 @@ class HostApplication:
         metrics: list,
         *,
         group_id: str = None,
-        qos: QoS = QoS.AT_MOST_ONCE,
+        qos: QoS = QoS.AT_LEAST_ONCE,
         retain: bool = False,
     ) -> None:
         """Send an NCMD (Node Command) to a given Edge Node.
